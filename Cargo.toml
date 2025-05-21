@@ -1,0 +1,29 @@
+[package]
+name = "arroy_benchmarks"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+clap = { version = "4.5.38", features=["derive"] }
+env_logger = "0.11.8"
+heed = "0.22.0"
+rand = { version = "0.8.5" }
+
+[dependencies.arroy]
+# git = "https://github.com/meilisearch/arroy"
+git = "https://github.com/nnethercott/arroy"
+branch = "replace-minheap-for-median"
+# path = "../arroy"
+
+[dev-dependencies]
+criterion = "0.6.0"
+ordered-float = "5.0.0"
+
+[[bin]]
+name = "import"
+path = "./src/import-vectors.rs"
+
+[[bench]]
+name = "reader"
+harness = false
+
