@@ -8,7 +8,14 @@ use rand::{
     prelude::*,
     rngs::{self, OsRng},
 };
-use std::{cmp::Reverse, collections::BinaryHeap, fs, hint::black_box, time::Instant};
+use std::{
+    cmp::Reverse,
+    collections::BinaryHeap,
+    fs,
+    hint::black_box,
+    num::NonZeroUsize,
+    time::{Duration, Instant},
+};
 
 const N: usize = 1000;
 const DEFAULT_MAP_SIZE: usize = 1024 * 1024 * 1024 * 2;
@@ -135,8 +142,9 @@ fn median_top_k(c: &mut Criterion) {
     }
 }
 
-fn reader_by_item(c: &mut Criterion)->arroy::Result<()> {
+fn reader_by_item(c: &mut Criterion) -> arroy::Result<()> {
     let mut group = c.benchmark_group("actuel");
+    group.warm_up_time(Duration::from_secs(5)).sample_size(1000);
 
     // setup
     let mut env_builder = EnvOpenOptions::new();
@@ -146,16 +154,15 @@ fn reader_by_item(c: &mut Criterion)->arroy::Result<()> {
     let database: Database<Cosine> = env.open_database(&rtxn, None)?.unwrap();
     let reader = Reader::open(&rtxn, 0, database)?;
 
-    for nns in vec![10000] {
+    for nns in vec![10, 100, 1000] {
         group.bench_function(BenchmarkId::new("reader", nns), |b| {
             b.iter_batched(
                 || {
-                    let item: u32 = thread_rng().gen_range(0..1000);
-                    // let item = 42;
+                    let item: u32 = thread_rng().gen_range(0..10000);
                     (reader.nns(nns), item)
                 },
-                |(q, i)| {
-                    let _ = q.by_item(&rtxn, i).unwrap();
+                |(builder, index)| {
+                    black_box(builder.by_item(&rtxn, index));
                 },
                 criterion::BatchSize::SmallInput,
             );
