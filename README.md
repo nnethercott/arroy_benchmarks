@@ -1,7 +1,14 @@
 # arroy benchmarks
 A small repo to test if my features actually improve performance. Benchmarks done with criterion.
 
-datacomp small vectors: https://meilisearch.notion.site/Movies-embeddings-1de3258859f54b799b7883882219d266
+
+
+## install 
+To build the arroy index i used the [datacomp small vectors](https://meilisearch.notion.site/Movies-embeddings-1de3258859f54b799b7883882219d26). Then unzipping and building the index can be done with:
+```
+ gzip -d < ~/Downloads/vectors.txt.gzip > ./assets/vectors.txt
+ cargo run --bin import -- --n-trees 20
+```
 
 To run the benchmarks:
 ```bash
@@ -13,9 +20,6 @@ cargo bench
 ## binary heap vs median-based top k
 Constructing a binary heap from n items and popping k elements costs O(n + klog(n)). Using a median-based strategy this cost goes down to O(n+klog(k)). Strategy from [this blog post](https://quickwit.io/blog/top-k-complexity).
 
-<details>
-  <summary>Sample bench</summary>
-
   In the table below we list the times like "median-based"/"binary heap"
 
 | n \ k | k=10 | k=100 | k=1000 |
@@ -24,7 +28,6 @@ Constructing a binary heap from n items and popping k elements costs O(n + klog(
 | **n=1000** | 2.495 µs/9.703 µs| 12.535 µs/15.577 µs| 45.091 µs/68.696 µs|
 | **n=10000** | 9.278 µs/88.466 µs | 27.969 µs/100.90 µs| 132.71 µs/184.45 µs|
 
-</details>
 
 ## replace OrderedFloat package with byte-wise Ord on u32 trasmutes
 I got this idea while reading [this article](https://ohadravid.github.io/posts/2025-05-rav1d-faster/#replace-field-wise-equality-with-byte-wise-equality-that-optimizes-better).
@@ -42,14 +45,10 @@ The ordered-float package implements `Ord` for floating point types, but when so
 For this benchmark I just timed how long it took to build a binary heap from each wrapper type for varying input sizes.
 
 
-<details>
-  <summary>Sample bench</summary>
-
 | n | OrderedFloat | NonNegativeOrderedFloat |
 |---|--------------|-------------------------|
 | **n=10** | 70.406 ns | 50.838 ns |
 | **n=100** | 877.75 ns | 452.93 ns |
 | **n=1000** | 9.1250 µs | 3.9375 µs |
 
-</details>
 
