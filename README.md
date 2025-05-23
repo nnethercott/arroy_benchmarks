@@ -3,7 +3,13 @@ A small repo to test if my features actually improve performance. Benchmarks don
 
 datacomp small vectors: https://meilisearch.notion.site/Movies-embeddings-1de3258859f54b799b7883882219d266
 
-# checks
+To run the benchmarks:
+```bash
+cargo bench
+```
+
+
+# ideas
 ## binary heap vs median-based top k
 Constructing a binary heap from n items and popping k elements costs O(n + klog(n)). Using a median-based strategy this cost goes down to O(n+klog(k)). Strategy from [this blog post](https://quickwit.io/blog/top-k-complexity).
 

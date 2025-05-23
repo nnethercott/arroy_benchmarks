@@ -15,7 +15,7 @@ use std::{
 
 //  sed "2q;d" vectors.txt | awk '{for (i=2; i<=NF; i++) print $i}' | wc -l
 
-const DEFAULT_MAP_SIZE: usize = 1024 * 1024 * 1024 * 2;
+const DEFAULT_MAP_SIZE: usize = 1024 * 1024 * 1024 * 200;
 
 // some data
 fn data_gen(n: usize) -> Vec<(OrderedFloat<f32>, u32)> {
@@ -213,7 +213,7 @@ fn reader_by_item(c: &mut Criterion) -> arroy::Result<()> {
 criterion_group!(
     benches,
     theoretical_top_k,
-    // race_ordered_floats,
-    // reader_by_item,
+    race_ordered_floats,
+    reader_by_item,
 );
 criterion_main!(benches);
