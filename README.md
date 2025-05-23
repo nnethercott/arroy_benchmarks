@@ -10,41 +10,13 @@ Constructing a binary heap from n items and popping k elements costs O(n + klog(
 <details>
   <summary>Sample bench</summary>
 
-  ```bash
-  heap/(n:100,k:10)
-              time:   [1.3426 µs 1.3540 µs 1.3672 µs]
-  median/(n:100,k:10)
-              time:   [974.39 ns 984.91 ns 997.26 ns]
-  heap/(n:100,k:100)
-              time:   [4.5147 µs 4.5563 µs 4.5997 µs]
-  median/(n:100,k:100)
-              time:   [3.2994 µs 3.3830 µs 3.4817 µs]
-  heap/(n:1000,k:10)
-              time:   [9.5652 µs 9.7025 µs 9.8644 µs]
-  median/(n:1000,k:10)
-              time:   [2.4634 µs 2.4949 µs 2.5329 µs]
-  heap/(n:1000,k:100)
-              time:   [15.354 µs 15.577 µs 15.836 µs]
-  median/(n:1000,k:100)
-              time:   [12.392 µs 12.535 µs 12.714 µs]
-  heap/(n:1000,k:1000)
-              time:   [68.019 µs 68.696 µs 69.489 µs]
-  median/(n:1000,k:1000)
-              time:   [44.650 µs 45.091 µs 45.596 µs]
-  heap/(n:10000,k:10)
-              time:   [87.452 µs 88.466 µs 89.602 µs]
-  median/(n:10000,k:10)
-              time:   [9.0498 µs 9.2777 µs 9.5439 µs]
-  heap/(n:10000,k:100)
-              time:   [98.695 µs 100.90 µs 103.61 µs]
-  median/(n:10000,k:100)
-              time:   [27.534 µs 27.969 µs 28.473 µs]
-  heap/(n:10000,k:1000)
-              time:   [182.67 µs 184.45 µs 186.40 µs]
-  median/(n:10000,k:1000)
-                          time:   [131.45 µs 132.71 µs 134.14 µs]
+  In the table below we list the times like "median-based"/"binary heap"
 
-  ```
+| n \ k | k=10 | k=100 | k=1000 |
+|-------|------|-------|-------|
+| **n=100** | 0.985 µs/1.354 µs| 3.383 µs/4.556 µs| - |
+| **n=1000** | 2.495 µs/9.703 µs| 12.535 µs/15.577 µs| 45.091 µs/68.696 µs|
+| **n=10000** | 9.278 µs/88.466 µs | 27.969 µs/100.90 µs| 132.71 µs/184.45 µs|
 
 </details>
 
@@ -67,20 +39,11 @@ For this benchmark I just timed how long it took to build a binary heap from eac
 <details>
   <summary>Sample bench</summary>
 
-  ```bash
-  OrderedFloat/n=10
-             time:   [68.947 ns 70.406 ns 72.469 ns]
-  NonNegativeOrderedFloat/n=10
-             time:   [50.342 ns 50.838 ns 51.402 ns]
-  OrderedFloat/n=100
-             time:   [861.26 ns 877.75 ns 897.06 ns]
-  NonNegativeOrderedFloat/n=100
-             time:   [445.68 ns 452.93 ns 461.57 ns]
-  OrderedFloat/n=1000
-             time:   [8.9741 µs 9.1250 µs 9.2960 µs]
-  NonNegativeOrderedFloat/n=1000
-             time:   [3.8946 µs 3.9375 µs 3.9892 µs]
-```
+| n | OrderedFloat | NonNegativeOrderedFloat |
+|---|--------------|-------------------------|
+| **n=10** | 70.406 ns | 50.838 ns |
+| **n=100** | 877.75 ns | 452.93 ns |
+| **n=1000** | 9.1250 µs | 3.9375 µs |
 
 </details>
 
