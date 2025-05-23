@@ -11,8 +11,6 @@ rand = { version = "0.8.5" }
 
 [dependencies.arroy]
 git = "https://github.com/meilisearch/arroy"
-# git = "https://github.com/nnethercott/arroy"
-# branch = "replace-minheap-for-median"
 # path = "../arroy"
 
 [dev-dependencies]
@@ -23,7 +21,15 @@ ordered-float = "5.0.0"
 name = "import"
 path = "./src/import-vectors.rs"
 
+[[bin]]
+name = "main"
+path = "./src/main.rs"
+
 [[bench]]
 name = "reader"
 harness = false
 
+[profile.release]
+debug = "line-tables-only"
+[profile.bench]
+debug = "line-tables-only"

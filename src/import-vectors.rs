@@ -78,7 +78,7 @@ fn main() -> Result<(), heed::BoxedError> {
     let now = Instant::now();
     let mut insertion_time = Duration::default();
     let mut count = 0;
-    for line in reader.lines().take(10001) {
+    for line in reader.lines().take(5001) {
         let line = line?;
         if line.starts_with("===") {
             continue;
