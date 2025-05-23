@@ -11,37 +11,37 @@ Constructing a binary heap from n items and popping k elements costs O(n + klog(
   <summary>Sample bench</summary>
 
   ```bash
-  theoretical/heap/(n:100,k:10)
-                          time:   [1.3426 µs 1.3540 µs 1.3672 µs]
-  theoretical/median/(n:100,k:10)
-                          time:   [974.39 ns 984.91 ns 997.26 ns]
-  theoretical/heap/(n:100,k:100)
-                          time:   [4.5147 µs 4.5563 µs 4.5997 µs]
-  theoretical/median/(n:100,k:100)
-                          time:   [3.2994 µs 3.3830 µs 3.4817 µs]
-  theoretical/heap/(n:1000,k:10)
-                          time:   [9.5652 µs 9.7025 µs 9.8644 µs]
-  theoretical/median/(n:1000,k:10)
-                          time:   [2.4634 µs 2.4949 µs 2.5329 µs]
-  theoretical/heap/(n:1000,k:100)
-                          time:   [15.354 µs 15.577 µs 15.836 µs]
-  theoretical/median/(n:1000,k:100)
-                          time:   [12.392 µs 12.535 µs 12.714 µs]
-  theoretical/heap/(n:1000,k:1000)
-                          time:   [68.019 µs 68.696 µs 69.489 µs]
-  theoretical/median/(n:1000,k:1000)
-                          time:   [44.650 µs 45.091 µs 45.596 µs]
-  theoretical/heap/(n:10000,k:10)
-                          time:   [87.452 µs 88.466 µs 89.602 µs]
-  theoretical/median/(n:10000,k:10)
-                          time:   [9.0498 µs 9.2777 µs 9.5439 µs]
-  theoretical/heap/(n:10000,k:100)
-                          time:   [98.695 µs 100.90 µs 103.61 µs]
-  theoretical/median/(n:10000,k:100)
-                          time:   [27.534 µs 27.969 µs 28.473 µs]
-  theoretical/heap/(n:10000,k:1000)
-                          time:   [182.67 µs 184.45 µs 186.40 µs]
-  theoretical/median/(n:10000,k:1000)
+  heap/(n:100,k:10)
+              time:   [1.3426 µs 1.3540 µs 1.3672 µs]
+  median/(n:100,k:10)
+              time:   [974.39 ns 984.91 ns 997.26 ns]
+  heap/(n:100,k:100)
+              time:   [4.5147 µs 4.5563 µs 4.5997 µs]
+  median/(n:100,k:100)
+              time:   [3.2994 µs 3.3830 µs 3.4817 µs]
+  heap/(n:1000,k:10)
+              time:   [9.5652 µs 9.7025 µs 9.8644 µs]
+  median/(n:1000,k:10)
+              time:   [2.4634 µs 2.4949 µs 2.5329 µs]
+  heap/(n:1000,k:100)
+              time:   [15.354 µs 15.577 µs 15.836 µs]
+  median/(n:1000,k:100)
+              time:   [12.392 µs 12.535 µs 12.714 µs]
+  heap/(n:1000,k:1000)
+              time:   [68.019 µs 68.696 µs 69.489 µs]
+  median/(n:1000,k:1000)
+              time:   [44.650 µs 45.091 µs 45.596 µs]
+  heap/(n:10000,k:10)
+              time:   [87.452 µs 88.466 µs 89.602 µs]
+  median/(n:10000,k:10)
+              time:   [9.0498 µs 9.2777 µs 9.5439 µs]
+  heap/(n:10000,k:100)
+              time:   [98.695 µs 100.90 µs 103.61 µs]
+  median/(n:10000,k:100)
+              time:   [27.534 µs 27.969 µs 28.473 µs]
+  heap/(n:10000,k:1000)
+              time:   [182.67 µs 184.45 µs 186.40 µs]
+  median/(n:10000,k:1000)
                           time:   [131.45 µs 132.71 µs 134.14 µs]
 
   ```
@@ -55,6 +55,8 @@ Essentially since distances are such that d(x,y)>=0 (it's one of their [core pro
 * inf which has all exponent bits set to 1's and 0's everywhere
 * nan which has all exponent bits set to 1's and at least one non zero fraction bit set to 1
 
+![alt-text](https://upload.wikimedia.org/wikipedia/commons/thumb/d/d2/Float_example.svg/885px-Float_example.svg.png)
+
 This means that `f32::INFINITY.to_bits()<f32::NAN.to_bits()` ! But we don't really care since NaN's should be caught earlier before our sorting ops.
 
 The ordered-float package implements `Ord` for floating point types, but when sorting distances (like when trying to find the top k elements) we don't need its full expressiveness - we can just cast the f32 to bits and compare directly. Doing it this way actually yields significant speedups. 
@@ -62,12 +64,10 @@ The ordered-float package implements `Ord` for floating point types, but when so
 For this benchmark I just timed how long it took to build a binary heap from each wrapper type for varying input sizes.
 
 
-![alt-text](https://upload.wikimedia.org/wikipedia/commons/thumb/d/d2/Float_example.svg/885px-Float_example.svg.png)
-
 <details>
   <summary>Sample bench</summary>
 
-  ```
+  ```bash
   OrderedFloat/n=10
              time:   [68.947 ns 70.406 ns 72.469 ns]
   NonNegativeOrderedFloat/n=10
