@@ -6,7 +6,7 @@ use heed::EnvOpenOptions;
 use ordered_float::OrderedFloat;
 use rand::{distributions::Uniform, prelude::*, rngs::OsRng};
 use std::{
-    // cell::Cell,
+    cell::Cell,
     cmp::Reverse,
     collections::BinaryHeap,
     hint::black_box,
@@ -144,7 +144,7 @@ fn race_ordered_floats(c: &mut Criterion) {
             b.iter_batched(
                 || data_gen(n),
                 |v| {
-                    let _ = BinaryHeap::from(v);
+                    let _ = black_box(BinaryHeap::from(v));
                 },
                 BatchSize::LargeInput,
             );
@@ -163,7 +163,7 @@ fn race_ordered_floats(c: &mut Criterion) {
                         .collect::<Vec<(NonNegativeOrderedFloat, u32)>>()
                 },
                 |v| {
-                    let _ = BinaryHeap::from(v);
+                    let _ = black_box(BinaryHeap::from(v));
                 },
                 BatchSize::LargeInput,
             );
@@ -176,8 +176,8 @@ fn race_ordered_floats(c: &mut Criterion) {
 fn reader_by_item(c: &mut Criterion) -> arroy::Result<()> {
     let mut group = c.benchmark_group("arroy");
     group
-        .measurement_time(Duration::from_secs(60))
-        .sample_size(1000);
+        .measurement_time(Duration::from_secs(30))
+        .sample_size(100);
 
     // setup; 20 trees, 5k vectors, 768 dimensions
     let mut env_builder = EnvOpenOptions::new();
@@ -187,20 +187,20 @@ fn reader_by_item(c: &mut Criterion) -> arroy::Result<()> {
     let database: Database<Cosine> = env.open_database(&rtxn, None)?.unwrap();
     let reader = Reader::open(&rtxn, 0, database)?;
 
-    // let n_items = reader.n_items() as u32;
-    // let counter = Cell::new(0);
+    let n_items = reader.n_items() as u32;
+    let counter = Cell::new(0);
 
-    for nns in vec![100] {
+    for nns in vec![10, 100, 1000] {
         group.bench_function(BenchmarkId::new("reader", nns), |b| {
             b.iter_batched(
                 || {
                     // let item = counter.get();
                     // counter.set((item + 1) % n_items);
-                    // (reader.nns(nns), item)
-                    reader.nns(nns)
+                    (reader.nns(nns), 42)
+                    // reader.nns(nns)
                 },
-                |builder| {
-                    let _ = black_box(builder.by_item(&rtxn, 42));
+                |(builder, item)| {
+                    let _ = black_box(builder.by_item(&rtxn, item));
                 },
                 criterion::BatchSize::SmallInput,
             );
@@ -212,8 +212,8 @@ fn reader_by_item(c: &mut Criterion) -> arroy::Result<()> {
 
 criterion_group!(
     benches,
-    // theoretical_top_k,
-    race_ordered_floats,
+    theoretical_top_k,
+    // race_ordered_floats,
     // reader_by_item,
 );
 criterion_main!(benches);
