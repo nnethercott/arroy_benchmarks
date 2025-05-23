@@ -70,7 +70,7 @@ dependencies = [
 [[package]]
 name = "arroy"
 version = "0.6.1"
-source = "git+https://github.com/meilisearch/arroy#7e783f83467cb998401e7cb83a533404f00f6d82"
+source = "git+https://github.com/nnethercott/arroy?branch=replace-minheap-for-median#9021007fd926efaf8a141fec9e989503f46e3c72"
 dependencies = [
  "bytemuck",
  "byteorder",
