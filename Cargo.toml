@@ -10,9 +10,10 @@ heed = "0.22.0"
 rand = { version = "0.8.5" }
 
 [dependencies.arroy]
+# git = "https://github.com/meilisearch/arroy"
+# branch = "main"
 git = "https://github.com/nnethercott/arroy"
 branch = "replace-minheap-for-median"
-# path = "../arroy"
 
 [dev-dependencies]
 criterion = "0.6.0"

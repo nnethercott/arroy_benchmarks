@@ -1,15 +1,12 @@
 use arroy::{Database, Reader, distances::Cosine};
 use arroy_benchmarks::custom_ordered_float::NonNegativeOrderedFloat;
 use core::f32;
-use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
+use criterion::{BatchSize, BenchmarkId, Criterion, SamplingMode, criterion_group, criterion_main};
 use heed::EnvOpenOptions;
 use ordered_float::OrderedFloat;
 use rand::{distributions::Uniform, prelude::*, rngs::OsRng};
 use std::{
-    cell::Cell,
-    cmp::Reverse,
-    collections::BinaryHeap,
-    hint::black_box,
+    cell::Cell, cmp::Reverse, collections::BinaryHeap, hint::black_box, num::NonZeroUsize,
     time::Duration,
 };
 
@@ -45,62 +42,68 @@ fn theoretical_top_k(c: &mut Criterion) {
 
     for n in [100, 1000, 10000] {
         'inner: for k in vec![10, 100, 1000] {
-            if k>n{
+            if k > n {
                 break 'inner;
             }
-            group.bench_function(BenchmarkId::new("heap", format!("(n:{},k:{})", n, k)), move |b| {
-                b.iter_batched(
-                    || data_gen_rev(n),
-                    |v| {
-                        let mut min_heap = BinaryHeap::from(v);
-                        let mut output = Vec::with_capacity(k);
+            group.bench_function(
+                BenchmarkId::new("heap", format!("(n:{},k:{})", n, k)),
+                move |b| {
+                    b.iter_batched(
+                        || data_gen_rev(n),
+                        |v| {
+                            let mut min_heap = BinaryHeap::from(v);
+                            let mut output = Vec::with_capacity(k);
 
-                        while let Some(Reverse((OrderedFloat(_dist), item))) = min_heap.pop() {
-                            if output.len() == k {
-                                break;
+                            while let Some(Reverse((OrderedFloat(_dist), item))) = min_heap.pop() {
+                                if output.len() == k {
+                                    break;
+                                }
+                                output.push((item, 0.0f32));
                             }
-                            output.push((item, 0.0f32));
-                        }
-                    },
-                    criterion::BatchSize::LargeInput,
-                );
-            });
+                        },
+                        criterion::BatchSize::LargeInput,
+                    );
+                },
+            );
 
-            group.bench_function(BenchmarkId::new("median", format!("(n:{},k:{})", n, k)), move |b| {
-                b.iter_batched(
-                    || data_gen(n),
-                    |v| {
-                        let mut buffer = Vec::with_capacity(2 * k);
-                        let mut v = v.into_iter();
-                        buffer.extend((&mut v).take(k));
-                        let mut threshold = OrderedFloat(f32::MAX);
+            group.bench_function(
+                BenchmarkId::new("median", format!("(n:{},k:{})", n, k)),
+                move |b| {
+                    b.iter_batched(
+                        || data_gen(n),
+                        |v| {
+                            let mut buffer = Vec::with_capacity(2 * k);
+                            let mut v = v.into_iter();
+                            buffer.extend((&mut v).take(k));
+                            let mut threshold = OrderedFloat(f32::MAX);
 
-                        for item in v {
-                            if item.0 >= threshold {
-                                continue;
+                            for item in v {
+                                if item.0 >= threshold {
+                                    continue;
+                                }
+                                if buffer.len() == 2 * k {
+                                    let (_, &mut median, _) = buffer.select_nth_unstable(k - 1);
+                                    threshold = median.0;
+                                    buffer.truncate(k);
+                                }
+
+                                // buffer resizing here?
+                                // buffer.push(item);
+                                let uninit = buffer.spare_capacity_mut();
+                                uninit[0].write(item);
+                                unsafe {
+                                    buffer.set_len(buffer.len() + 1);
+                                }
                             }
-                            if buffer.len() == 2 * k {
-                                let (_, &mut median, _) = buffer.select_nth_unstable(k - 1);
-                                threshold = median.0;
-                                buffer.truncate(k);
-                            }
 
-                            // buffer resizing here?
-                            // buffer.push(item);
-                            let uninit = buffer.spare_capacity_mut();
-                            uninit[0].write(item);
-                            unsafe {
-                                buffer.set_len(buffer.len() + 1);
-                            }
-                        }
-
-                        // final sort
-                        buffer.sort_unstable();
-                        buffer.truncate(k);
-                    },
-                    criterion::BatchSize::LargeInput,
-                );
-            });
+                            // final sort
+                            buffer.sort_unstable();
+                            buffer.truncate(k);
+                        },
+                        criterion::BatchSize::LargeInput,
+                    );
+                },
+            );
         }
         // group.bench_function(BenchmarkId::new("O(n+k*log(n)*log(k))", k), move |b| {
         //     b.iter_batched(
@@ -176,10 +179,13 @@ fn race_ordered_floats(c: &mut Criterion) {
 fn reader_by_item(c: &mut Criterion) -> arroy::Result<()> {
     let mut group = c.benchmark_group("arroy");
     group
-        .measurement_time(Duration::from_secs(30))
-        .sample_size(100);
+        .warm_up_time(Duration::from_secs(10))
+        .measurement_time(Duration::from_secs(180))
+        .sample_size(300)
+        // .nresamples(200_000)
+        .sampling_mode(SamplingMode::Flat);
 
-    // setup; 20 trees, 5k vectors, 768 dimensions
+    // setup; 10 trees, 2k vectors, 768 dimensions
     let mut env_builder = EnvOpenOptions::new();
     env_builder.map_size(DEFAULT_MAP_SIZE);
     let env = unsafe { env_builder.open("assets/import.ary/") }.unwrap();
@@ -190,21 +196,25 @@ fn reader_by_item(c: &mut Criterion) -> arroy::Result<()> {
     let n_items = reader.n_items() as u32;
     let counter = Cell::new(0);
 
-    for nns in vec![10, 100, 1000] {
-        group.bench_function(BenchmarkId::new("reader", nns), |b| {
-            b.iter_batched(
-                || {
-                    // let item = counter.get();
-                    // counter.set((item + 1) % n_items);
-                    (reader.nns(nns), 42)
-                    // reader.nns(nns)
-                },
-                |(builder, item)| {
-                    let _ = black_box(builder.by_item(&rtxn, item));
-                },
-                criterion::BatchSize::SmallInput,
-            );
-        });
+    for nns in vec![10, 100] {
+        for o in vec![1, 10, 100]{
+            group.bench_function(BenchmarkId::new("reader", format!("(oversampling: {}, nns: {})", o, nns)), |b| {
+                b.iter_batched(
+                    || {
+                        // let item = counter.get();
+                        // counter.set((item + 1) % n_items);
+                        (reader.nns(nns), 42)
+                        // reader.nns(nns)
+                    },
+                    |(mut builder, item)| {
+                        let _ = builder
+                            .oversampling(NonZeroUsize::new(o).unwrap()) // 10trees x 100
+                            .by_item(&rtxn, item);
+                    },
+                    criterion::BatchSize::SmallInput,
+                );
+            });
+        }
     }
 
     Ok(())
@@ -212,8 +222,8 @@ fn reader_by_item(c: &mut Criterion) -> arroy::Result<()> {
 
 criterion_group!(
     benches,
-    theoretical_top_k,
-    race_ordered_floats,
+    // theoretical_top_k,
+    // race_ordered_floats,
     reader_by_item,
 );
 criterion_main!(benches);

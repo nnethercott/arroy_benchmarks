@@ -42,6 +42,10 @@ struct Cli {
     #[arg(long)]
     n_trees: Option<usize>,
 
+    /// The number of vectors to read in
+    #[arg(long)]
+    n_vecs: Option<usize>,
+
     /// The seed to generate the internal trees.
     #[arg(long, default_value_t = 42)]
     seed: u64,
@@ -50,7 +54,7 @@ struct Cli {
 fn main() -> Result<(), heed::BoxedError> {
     env_logger::init();
 
-    let Cli { database, map_size, dimensions, write_map, no_append, n_trees, seed } = Cli::parse();
+    let Cli { database, map_size, dimensions, write_map, no_append, n_trees, n_vecs, seed } = Cli::parse();
 
     let mut rng = StdRng::seed_from_u64(seed);
     // let reader = BufReader::new(std::io::stdin());
@@ -78,7 +82,7 @@ fn main() -> Result<(), heed::BoxedError> {
     let now = Instant::now();
     let mut insertion_time = Duration::default();
     let mut count = 0;
-    for line in reader.lines().take(5001) {
+    for line in reader.lines().take(n_vecs.unwrap_or(10_000)+1){
         let line = line?;
         if line.starts_with("===") {
             continue;
