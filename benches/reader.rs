@@ -1,5 +1,5 @@
 use arroy::{Database, Reader, distances::Cosine};
-use arroy_benchmarks::custom_ordered_float::NonNegativeOrderedFloat;
+use arroy_benchmarks::custom_ordered_float::{BytemuckFloat, NonNegativeOrderedFloat};
 use core::f32;
 use criterion::{BatchSize, BenchmarkId, Criterion, SamplingMode, criterion_group, criterion_main};
 use heed::EnvOpenOptions;
@@ -180,9 +180,9 @@ fn reader_by_item(c: &mut Criterion) -> arroy::Result<()> {
     let mut group = c.benchmark_group("arroy");
     group
         .warm_up_time(Duration::from_secs(10))
-        .measurement_time(Duration::from_secs(180))
-        .sample_size(300)
-        // .nresamples(200_000)
+        .measurement_time(Duration::from_secs(90))
+        .sample_size(200)
+        .nresamples(200_000)
         .sampling_mode(SamplingMode::Flat);
 
     // setup; 10 trees, 2k vectors, 768 dimensions
@@ -196,15 +196,14 @@ fn reader_by_item(c: &mut Criterion) -> arroy::Result<()> {
     let n_items = reader.n_items() as u32;
     let counter = Cell::new(0);
 
-    for nns in vec![10, 100] {
-        for o in vec![1, 10, 100]{
+    for nns in vec![10, 100, 1000] {
+        for o in vec![1]{
             group.bench_function(BenchmarkId::new("reader", format!("(oversampling: {}, nns: {})", o, nns)), |b| {
                 b.iter_batched(
                     || {
                         // let item = counter.get();
                         // counter.set((item + 1) % n_items);
-                        (reader.nns(nns), 42)
-                        // reader.nns(nns)
+                        (reader.nns(nns), 100)
                     },
                     |(mut builder, item)| {
                         let _ = builder
@@ -223,7 +222,7 @@ fn reader_by_item(c: &mut Criterion) -> arroy::Result<()> {
 criterion_group!(
     benches,
     // theoretical_top_k,
-    // race_ordered_floats,
-    reader_by_item,
+    race_ordered_floats,
+    // reader_by_item,
 );
 criterion_main!(benches);

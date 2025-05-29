@@ -5,19 +5,19 @@ use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
-use arroy::distances::Cosine;
-use arroy::{Database, Writer};
+use anyhow::Result;
+use arroy::{Database, Distance, Writer};
 use clap::Parser;
 use heed::{EnvFlags, EnvOpenOptions};
-use rand::rngs::StdRng;
 use rand::SeedableRng;
+use rand::rngs::StdRng;
 
 /// 1 GiB
 const DEFAULT_MAP_SIZE: usize = 1024 * 1024 * 1024 * 1;
 
-#[derive(Parser)]
-#[command(author, version, about, long_about = None)]
-struct Cli {
+#[derive(Parser, Default)]
+#[command(author, version, about, long_about = None,)]
+pub struct Args {
     /// Sets a custom database path.
     #[arg(default_value = "assets/import.ary")]
     database: PathBuf,
@@ -51,28 +51,44 @@ struct Cli {
     seed: u64,
 }
 
-fn main() -> Result<(), heed::BoxedError> {
+pub fn build<D: Distance>(mut args: Args) -> Result<()> {
     env_logger::init();
 
-    let Cli { database, map_size, dimensions, write_map, no_append, n_trees, n_vecs, seed } = Cli::parse();
+    let Args {
+        database,
+        map_size,
+        dimensions,
+        write_map,
+        no_append,
+        n_trees,
+        n_vecs,
+        seed,
+    } = args;
 
     let mut rng = StdRng::seed_from_u64(seed);
-    // let reader = BufReader::new(std::io::stdin());
     let file = File::open("assets/vectors.txt").unwrap();
     let reader = BufReader::new(&file);
 
+    // fresh start each time
+    if fs::exists(&database)? {
+        fs::remove_dir_all(&database)?;
+    }
     let _ = fs::create_dir_all(&database);
 
     // Open the environment with the appropriate flags.
-    let flags = if write_map { EnvFlags::WRITE_MAP } else { EnvFlags::empty() };
+    let flags = if write_map {
+        EnvFlags::WRITE_MAP
+    } else {
+        EnvFlags::empty()
+    };
     let mut env_builder = EnvOpenOptions::new();
     env_builder.map_size(map_size);
     unsafe { env_builder.flags(flags) };
     let env = unsafe { env_builder.open(&database) }.unwrap();
 
     let mut wtxn = env.write_txn().unwrap();
-    let database: Database<Cosine> = env.create_database(&mut wtxn, None)?;
-    let writer = Writer::<Cosine>::new(database, 0, dimensions);
+    let database: Database<D> = env.create_database(&mut wtxn, None)?;
+    let writer = Writer::<D>::new(database, 0, dimensions);
 
     // The file look like that
     // === BEGIN vectors ===
@@ -82,7 +98,7 @@ fn main() -> Result<(), heed::BoxedError> {
     let now = Instant::now();
     let mut insertion_time = Duration::default();
     let mut count = 0;
-    for line in reader.lines().take(n_vecs.unwrap_or(10_000)+1){
+    for line in reader.lines().take(n_vecs.unwrap_or(10_000) + 1) {
         let line = line?;
         if line.starts_with("===") {
             continue;
@@ -105,11 +121,12 @@ fn main() -> Result<(), heed::BoxedError> {
         insertion_time += now.elapsed();
         count += 1;
     }
-    println!("Took {:.2?} to parse and insert into arroy", now.elapsed() - insertion_time);
+    println!(
+        "Took {:.2?} to parse and insert into arroy",
+        now.elapsed() - insertion_time
+    );
     println!("Took {insertion_time:.2?} insert into arroy");
     println!("There are {count} vectors");
-    println!();
-
     println!("Building the arroy internal trees...");
     let now = Instant::now();
     let mut builder = writer.builder(&mut rng);
