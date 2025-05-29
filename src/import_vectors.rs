@@ -15,46 +15,46 @@ use rand::rngs::StdRng;
 /// 1 GiB
 const DEFAULT_MAP_SIZE: usize = 1024 * 1024 * 1024 * 1;
 
-#[derive(Parser, Default)]
+#[derive(Parser, Default, Clone)]
 #[command(author, version, about, long_about = None,)]
-pub struct Args {
+pub struct BuildArgs {
     /// Sets a custom database path.
     #[arg(default_value = "assets/import.ary")]
-    database: PathBuf,
+    pub database: PathBuf,
 
     /// Specify the size of the database.
     #[arg(long, default_value_t = DEFAULT_MAP_SIZE)]
-    map_size: usize,
+    pub map_size: usize,
 
     /// The number of dimensions to construct the arroy tree.
     #[arg(long, default_value_t = 768)]
-    dimensions: usize,
+    pub dimensions: usize,
 
     /// Use the MDB_WRITEMAP option to reduce the memory usage of LMDB.
     #[arg(long)]
-    write_map: bool,
+    pub write_map: bool,
 
     /// Do not try to append items into the database.
     #[arg(long)]
-    no_append: bool,
+    pub no_append: bool,
 
     /// The number of tress to generate.
     #[arg(long)]
-    n_trees: Option<usize>,
+    pub n_trees: Option<usize>,
 
     /// The number of vectors to read in
     #[arg(long)]
-    n_vecs: Option<usize>,
+    pub n_vecs: Option<usize>,
 
     /// The seed to generate the internal trees.
     #[arg(long, default_value_t = 42)]
-    seed: u64,
+    pub seed: u64,
 }
 
-pub fn build<D: Distance>(mut args: Args) -> Result<()> {
+pub fn build<D: Distance>(args: BuildArgs) -> Result<()> {
     env_logger::init();
 
-    let Args {
+    let BuildArgs {
         database,
         map_size,
         dimensions,
@@ -136,6 +136,5 @@ pub fn build<D: Distance>(mut args: Args) -> Result<()> {
     builder.build(&mut wtxn)?;
     wtxn.commit().unwrap();
     println!("Took {:.2?} to build", now.elapsed());
-
     Ok(())
 }

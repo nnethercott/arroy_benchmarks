@@ -1,5 +1,5 @@
 use arroy::{Database, Reader, distances::Cosine};
-use arroy_benchmarks::custom_ordered_float::{BytemuckFloat, NonNegativeOrderedFloat};
+use arroy_benchmarks::custom_ordered_float::NonNegativeOrderedFloat;
 use core::f32;
 use criterion::{BatchSize, BenchmarkId, Criterion, SamplingMode, criterion_group, criterion_main};
 use heed::EnvOpenOptions;
