@@ -26,6 +26,7 @@ fn data_gen(n: usize) -> Vec<(OrderedFloat<f32>, u32)> {
 }
 
 // some reversed data !
+#[allow(dead_code)]
 fn data_gen_rev(n: usize) -> Vec<Reverse<(OrderedFloat<f32>, u32)>> {
     let uniform = Uniform::new(0.0f32, 1.0);
     (0..n)
@@ -37,6 +38,7 @@ fn data_gen_rev(n: usize) -> Vec<Reverse<(OrderedFloat<f32>, u32)>> {
 }
 
 /// bench different top k strategies
+#[allow(dead_code)]
 fn theoretical_top_k(c: &mut Criterion) {
     let mut group = c.benchmark_group("theoretical");
 
@@ -193,8 +195,8 @@ fn reader_by_item(c: &mut Criterion) -> arroy::Result<()> {
     let database: Database<Cosine> = env.open_database(&rtxn, None)?.unwrap();
     let reader = Reader::open(&rtxn, 0, database)?;
 
-    let n_items = reader.n_items() as u32;
-    let counter = Cell::new(0);
+    let _n_items = reader.n_items() as u32;
+    let _counter = Cell::new(0);
 
     for nns in vec![10, 100, 1000] {
         for o in vec![1]{

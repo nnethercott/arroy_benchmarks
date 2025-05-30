@@ -84,8 +84,7 @@ dependencies = [
 
 [[package]]
 name = "arroy"
-version = "0.6.1"
-source = "git+https://github.com/meilisearch/arroy?branch=main#7e783f83467cb998401e7cb83a533404f00f6d82"
+version = "0.7.0"
 dependencies = [
  "bytemuck",
  "byteorder",
@@ -118,6 +117,7 @@ dependencies = [
  "ndarray",
  "ordered-float 5.0.0",
  "rand",
+ "rayon",
  "roaring",
 ]
 

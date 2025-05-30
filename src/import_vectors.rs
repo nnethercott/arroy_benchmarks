@@ -15,7 +15,7 @@ use rand::rngs::StdRng;
 /// 1 GiB
 const DEFAULT_MAP_SIZE: usize = 1024 * 1024 * 1024 * 1;
 
-#[derive(Parser, Default, Clone)]
+#[derive(Parser, Default, Clone, Debug)]
 #[command(author, version, about, long_about = None,)]
 pub struct BuildArgs {
     /// Sets a custom database path.
