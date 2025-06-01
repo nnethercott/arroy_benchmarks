@@ -18,9 +18,9 @@ roaring = "0.10.12"
 rayon = "1.10.0"
 
 [dependencies.arroy]
-git = "https://github.com/meilisearch/arroy"
-branch = "main"
-# path = "../arroy/"
+# git = "https://github.com/meilisearch/arroy"
+# branch = "main"
+path = "../arroy/"
 
 [dev-dependencies]
 criterion = "0.6.0"
@@ -30,12 +30,13 @@ ordered-float = "5.0.0"
 name = "recall"
 path = "./src/recall.rs"
 
-[[bench]]
-name = "reader"
-harness = false
+[[bin]]
+name = "import"
+path = "./src/bin/import.rs"
+
 
 [[bench]]
-name = "perf"
+name = "reader"
 harness = false
 
 [profile.release]

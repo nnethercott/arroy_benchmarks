@@ -1,4 +1,4 @@
-use arroy::{Database, Reader, distances::Cosine};
+use arroy::{distances::{BinaryQuantizedCosine, Cosine}, Database, Reader};
 use arroy_benchmarks::custom_ordered_float::NonNegativeOrderedFloat;
 use core::f32;
 use criterion::{BatchSize, BenchmarkId, Criterion, SamplingMode, criterion_group, criterion_main};
@@ -6,8 +6,7 @@ use heed::EnvOpenOptions;
 use ordered_float::OrderedFloat;
 use rand::{distributions::Uniform, prelude::*, rngs::OsRng};
 use std::{
-    cell::Cell, cmp::Reverse, collections::BinaryHeap, hint::black_box, num::NonZeroUsize,
-    time::Duration,
+    cell::Cell, cmp::Reverse, collections::BinaryHeap, hint::black_box, mem::{self, MaybeUninit}, num::NonZeroUsize, time::Duration
 };
 
 //  sed "2q;d" vectors.txt | awk '{for (i=2; i<=NF; i++) print $i}' | wc -l
@@ -178,53 +177,138 @@ fn race_ordered_floats(c: &mut Criterion) {
 
 /// bench proxy for real code perf
 #[allow(dead_code)]
-fn reader_by_item(c: &mut Criterion) -> arroy::Result<()> {
+fn reader_by_item(c: &mut Criterion) {
     let mut group = c.benchmark_group("arroy");
-    group
-        .warm_up_time(Duration::from_secs(10))
-        .measurement_time(Duration::from_secs(90))
-        .sample_size(200)
-        .nresamples(200_000)
-        .sampling_mode(SamplingMode::Flat);
+    // group
+    //     .warm_up_time(Duration::from_secs(10))
+    //     .measurement_time(Duration::from_secs(90))
+    //     .sample_size(200)
+    //     .nresamples(200_000)
+    //     .sampling_mode(SamplingMode::Flat);
+
+    if cfg!(any(target_arch = "x86", target_arch = "x86_64")) {
+        println!("SSE instructions are active!");
+    }
 
     // setup; 10 trees, 2k vectors, 768 dimensions
     let mut env_builder = EnvOpenOptions::new();
     env_builder.map_size(DEFAULT_MAP_SIZE);
     let env = unsafe { env_builder.open("assets/import.ary/") }.unwrap();
-    let rtxn = env.read_txn()?;
-    let database: Database<Cosine> = env.open_database(&rtxn, None)?.unwrap();
-    let reader = Reader::open(&rtxn, 0, database)?;
+    let rtxn = env.read_txn().unwrap();
+    let database: Database<BinaryQuantizedCosine> = env.open_database(&rtxn, None).unwrap().unwrap();
+    let reader = Reader::open(&rtxn, 0, database).unwrap();
 
     let _n_items = reader.n_items() as u32;
     let _counter = Cell::new(0);
 
-    for nns in vec![10, 100, 1000] {
-        for o in vec![1]{
-            group.bench_function(BenchmarkId::new("reader", format!("(oversampling: {}, nns: {})", o, nns)), |b| {
-                b.iter_batched(
-                    || {
-                        // let item = counter.get();
-                        // counter.set((item + 1) % n_items);
-                        (reader.nns(nns), 100)
-                    },
-                    |(mut builder, item)| {
-                        let _ = builder
-                            .oversampling(NonZeroUsize::new(o).unwrap()) // 10trees x 100
-                            .by_item(&rtxn, item);
-                    },
-                    criterion::BatchSize::SmallInput,
-                );
-            });
+    for nns in vec![10] {
+        for o in vec![1] {
+            group.bench_function(
+                BenchmarkId::new("reader", format!("(oversampling: {}, nns: {})", o, nns)),
+                |b| {
+                    b.iter_batched(
+                        || {
+                            // let item = counter.get();
+                            // counter.set((item + 1) % n_items);
+                            (reader.nns(nns), 100)
+                        },
+                        |(mut builder, item)| {
+                            let _ = builder
+                                .oversampling(NonZeroUsize::new(o).unwrap()) // 10trees x 100
+                                .by_item(&rtxn, item);
+                        },
+                        criterion::BatchSize::SmallInput,
+                    );
+                },
+            );
+        }
+    }
+}
+
+
+// testing some different ways to populate vectors 
+fn data(size: usize) -> Vec<u8> {
+    let mut v = vec![0u8; size];
+    thread_rng().fill(&mut v[..]);
+    v
+}
+
+fn hot_loop_maybeuninit(data: &[u8]) -> Vec<u8> {
+    let len = data.len();
+    let mut out = vec![MaybeUninit::<u8>::uninit(); len];
+
+    for (i, g) in data.into_iter().enumerate() {
+        out[i] = MaybeUninit::new(*g);
+    }
+    unsafe { out.set_len(len) } // question: would i have panicked above ?
+    unsafe { mem::transmute::<_, Vec<u8>>(out) }
+}
+
+fn hot_loop_with_capacity(data: &[u8]) -> Vec<u8> {
+    let len = data.len();
+    let mut out = Vec::with_capacity(len);
+
+    for g in data.into_iter() {
+        out.push(*g);
+    }
+
+    out
+}
+
+fn hot_loop_with_midground(data: &[u8]) -> Vec<u8> {
+    let len = data.len();
+    let mut out = Vec::with_capacity(len);
+
+    for g in data.into_iter() {
+        let uninit = out.spare_capacity_mut();
+        uninit[0].write(*g);
+        unsafe {
+            out.set_len(out.len() + 1);
         }
     }
 
-    Ok(())
+    out
+}
+
+fn maybeuninit(c: &mut Criterion) {
+    let mut group = c.benchmark_group("vecs-and-stuff");
+
+    group.bench_function("maybeuninit", |b| {
+        b.iter_batched(
+            || data(768),
+            |v| {
+                black_box(hot_loop_maybeuninit(&v));
+            },
+            criterion::BatchSize::SmallInput,
+        );
+    });
+
+    group.bench_function("capacity", |b| {
+        b.iter_batched(
+            || data(768),
+            |v| {
+                black_box(hot_loop_with_capacity(&v));
+            },
+            criterion::BatchSize::SmallInput,
+        );
+    });
+
+    group.bench_function("mid", |b| {
+        b.iter_batched(
+            || data(768),
+            |v| {
+                black_box(hot_loop_with_midground(&v));
+            },
+            criterion::BatchSize::SmallInput,
+        );
+    });
 }
 
 criterion_group!(
     benches,
     // theoretical_top_k,
-    race_ordered_floats,
-    // reader_by_item,
+    // race_ordered_floats,
+    // maybeuninit,
+    reader_by_item,
 );
 criterion_main!(benches);
