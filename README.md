@@ -52,3 +52,8 @@ For this benchmark I just timed how long it took to build a binary heap from eac
 | **n=1000** | 9.1250 µs | 3.9375 µs |
 
 
+
+# relevancy 
+```bash
+cargo run --bin recall -- --n-trees 1 --n-vecs 10000 --dataset movies
+```

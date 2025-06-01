@@ -5,7 +5,7 @@ use arroy::{
     Database, Distance, Reader,
     distances::{Cosine, Euclidean, Manhattan},
 };
-use arroy_benchmarks::import_vectors::{BuildArgs, build};
+use arroy_benchmarks::utils::{BuildArgs, build};
 use clap::Parser;
 use fast_distances::{cosine, euclidean, manhattan};
 use heed::{EnvOpenOptions, RoTxn, WithTls};
@@ -65,7 +65,7 @@ fn run<D: Distance + HowFar>(args: Args) -> Result<()> {
 
     let mut env_builder = EnvOpenOptions::new();
     env_builder.map_size(1024 * 1024 * 1024 * 1);
-    let env = unsafe { env_builder.open(&build_args.database) }?;
+    let env = unsafe { env_builder.open(&build_args.temp_dir) }?;
 
     // build arroy::Reader
     let res = (0..run_args.n_samples.unwrap_or(10))
@@ -106,11 +106,12 @@ fn simulate<D: Distance + HowFar>(
     // put these in order
     points.par_sort_unstable_by_key(|(_, p)| OrderedFloat(D::distance(query, p)));
 
-    let mut nns = reader.nns(*recalls.iter().max().unwrap());
+    let mut nns = reader.nns(recalls[recalls.len()-1]);
     if let Some(&search_k) = run_args.search_k.as_ref() {
         nns.search_k(NonZeroUsize::new(search_k).unwrap());
     }
 
+    // /!\ top k is already ordered by relevance
     let neighbors = nns.by_vector(rtxn, query)?;
 
     let scores: Vec<_> = recalls
@@ -118,12 +119,12 @@ fn simulate<D: Distance + HowFar>(
         .map(|&r| {
             // get ids of first `r` points
             let relevant = &points[..r];
-            let relevant = RoaringBitmap::from_iter(relevant.iter().map(|(a, _)| *a));
+            let relevant_bitmap = RoaringBitmap::from_iter(relevant.iter().map(|(a, _)| *a));
 
             // retain top `r` neighbors
-            let retrieved = RoaringBitmap::from_iter(neighbors.iter().take(r).map(|(a, _)| *a));
+            let retrieved_bitmap = RoaringBitmap::from_iter(neighbors.iter().take(r).map(|(a, _)| *a));
 
-            (relevant.intersection_len(&retrieved) as f32) / (r as f32)
+            (relevant_bitmap.intersection_len(&retrieved_bitmap) as f32) / (r as f32)
         })
         .collect();
 

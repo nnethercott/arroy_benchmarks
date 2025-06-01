@@ -8,6 +8,7 @@ clap = { version = "4.5.38", features=["derive"] }
 env_logger = "0.11.8"
 heed = "0.22.0"
 rand = { version = "0.8.5" }
+rand_distr = "0.4.0"
 bytemuck = "1.23.0"
 anyhow = "1.0.98"
 fast-distances = "0.0.1"
@@ -17,20 +18,13 @@ roaring = "0.10.12"
 rayon = "1.10.0"
 
 [dependencies.arroy]
-# git = "https://github.com/meilisearch/arroy"
-# branch = "main"
-path = "../arroy/"
-# git = "https://github.com/nnethercott/arroy"
-# branch = "replace-ordered-float"
-# branch = "replace-minheap-for-median"
+git = "https://github.com/meilisearch/arroy"
+branch = "main"
+# path = "../arroy/"
 
 [dev-dependencies]
 criterion = "0.6.0"
 ordered-float = "5.0.0"
-
-[[bin]]
-name = "main"
-path = "./src/main.rs"
 
 [[bin]]
 name = "recall"
@@ -38,6 +32,10 @@ path = "./src/recall.rs"
 
 [[bench]]
 name = "reader"
+harness = false
+
+[[bench]]
+name = "perf"
 harness = false
 
 [profile.release]
