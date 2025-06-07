@@ -114,6 +114,7 @@ dependencies = [
  "env_logger",
  "fast-distances",
  "heed",
+ "memmap2",
  "ndarray",
  "ordered-float 5.0.0",
  "rand",

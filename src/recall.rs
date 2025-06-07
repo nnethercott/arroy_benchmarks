@@ -2,12 +2,11 @@ use std::{num::NonZeroUsize, str::FromStr};
 
 use anyhow::Result;
 use arroy::{
-    Database, Distance, Reader,
-    distances::{Cosine, Euclidean, Manhattan},
+    distances::{Cosine, Euclidean, Manhattan}, Database, Distance, Reader
 };
 use arroy_benchmarks::utils::{BuildArgs, build};
 use clap::Parser;
-use fast_distances::{cosine, euclidean, manhattan};
+use fast_distances::{cosine, euclidean, hamming, manhattan};
 use heed::{EnvOpenOptions, RoTxn, WithTls};
 use ordered_float::OrderedFloat;
 use rand::{SeedableRng, rngs::StdRng, seq::SliceRandom};
@@ -21,6 +20,7 @@ pub enum DistanceType {
     #[default]
     Euclidean,
     Manhattan,
+    Hamming,
 }
 impl FromStr for DistanceType {
     type Err = &'static str;
@@ -30,6 +30,7 @@ impl FromStr for DistanceType {
             "cosine" => Ok(DistanceType::Cosine),
             "euclidean" => Ok(DistanceType::Euclidean),
             "manhattan" => Ok(DistanceType::Manhattan),
+            "hamming" => Ok(DistanceType::Hamming),
             _ => Err("not a valid distance"),
         }
     }
@@ -64,8 +65,10 @@ fn run<D: Distance + HowFar>(args: Args) -> Result<()> {
     build::<D>(build_args.clone())?;
 
     let mut env_builder = EnvOpenOptions::new();
-    env_builder.map_size(1024 * 1024 * 1024 * 1);
+    env_builder.map_size(1024 * 1024 * 1024 * 20);
     let env = unsafe { env_builder.open(&build_args.temp_dir) }?;
+    let rtxn = env.read_txn()?;
+    let database: Database<D> = env.open_database(&rtxn, None)?.unwrap();
 
     // build arroy::Reader
     let res = (0..run_args.n_samples.unwrap_or(10))
@@ -73,7 +76,6 @@ fn run<D: Distance + HowFar>(args: Args) -> Result<()> {
         .map(|i| {
             // create new rotxn
             let rtxn = env.read_txn()?;
-            let database: Database<D> = env.open_database(&rtxn, None)?.unwrap();
             let reader = Reader::open(&rtxn, 0, database)?;
 
             // get points
@@ -81,7 +83,7 @@ fn run<D: Distance + HowFar>(args: Args) -> Result<()> {
 
             // simulate
             let mut rng = StdRng::seed_from_u64(build_args.seed + i);
-            let recalls: Vec<usize> = vec![1, 10, 20, 50, 100, 500];
+            let recalls: Vec<usize> = vec![1, 10, 100, 500];
             let (_, query) = points.choose(&mut rng).unwrap();
             let scores =
                 simulate(&reader, &rtxn, query, points.clone(), &recalls, &run_args).unwrap();
@@ -118,11 +120,14 @@ fn simulate<D: Distance + HowFar>(
         .iter()
         .map(|&r| {
             // get ids of first `r` points
-            let relevant = &points[..r];
-            let relevant_bitmap = RoaringBitmap::from_iter(relevant.iter().map(|(a, _)| *a));
+            let relevant: Vec<_> = (&points[..r]).iter().map(|(a, _)| *a).collect();
+            // dbg!("{:?}", &relevant);
+            let relevant_bitmap = RoaringBitmap::from_iter(relevant);
 
             // retain top `r` neighbors
-            let retrieved_bitmap = RoaringBitmap::from_iter(neighbors.iter().take(r).map(|(a, _)| *a));
+            let retrieved: Vec<_> = neighbors.iter().take(r).map(|(a, _)| *a).collect();
+            // dbg!("{:?}", &retrieved);
+            let retrieved_bitmap = RoaringBitmap::from_iter(retrieved);
 
             (relevant_bitmap.intersection_len(&retrieved_bitmap) as f32) / (r as f32)
         })
@@ -151,6 +156,11 @@ impl HowFar for Manhattan {
         manhattan(&ndarray::aview1(p), &ndarray::aview1(q))
     }
 }
+// impl HowFar for Hamming{
+//     fn distance(p: &[f32], q: &[f32]) -> f32 {
+//         hamming(&ndarray::aview1(p), &ndarray::aview1(q)) as f32
+//       }  
+// }
 
 fn reduce_mean_axis0(matrix: &[Vec<f32>]) -> Vec<f32> {
     if matrix.is_empty() {
@@ -180,6 +190,8 @@ fn main() -> Result<()> {
         DistanceType::Cosine => run::<Cosine>(args).unwrap(),
         DistanceType::Euclidean => run::<Euclidean>(args).unwrap(),
         DistanceType::Manhattan => run::<Manhattan>(args).unwrap(),
+        DistanceType::Hamming => todo!(),
+        // DistanceType::Hamming => run::<Hamming>(args).unwrap(),
     }
 
     Ok(())

@@ -307,8 +307,8 @@ fn maybeuninit(c: &mut Criterion) {
 criterion_group!(
     benches,
     // theoretical_top_k,
-    // race_ordered_floats,
+    race_ordered_floats,
     // maybeuninit,
-    reader_by_item,
+    // reader_by_item,
 );
 criterion_main!(benches);

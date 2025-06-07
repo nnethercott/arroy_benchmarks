@@ -4,5 +4,5 @@ use clap::Parser;
 
 fn main() {
     let args = BuildArgs::parse();
-    build::<BinaryQuantizedCosine>(args.clone()).expect(&format!("failed to build with args {:?}", args));
+    build::<Cosine>(args.clone()).expect(&format!("failed to build with args {:?}", args));
 }

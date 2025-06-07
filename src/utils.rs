@@ -12,8 +12,10 @@ use heed::{EnvFlags, EnvOpenOptions};
 use rand::{Rng, SeedableRng, rngs::StdRng};
 use rand_distr::Normal;
 
+use crate::mmapped_datasets::MatLEView;
+
 /// 1 GiB
-const DEFAULT_MAP_SIZE: usize = 1024 * 1024 * 1024 * 1;
+const DEFAULT_MAP_SIZE: usize = 1024 * 1024 * 1024 * 20;
 const MOVIE_VECTORS: &'static str = "assets/vectors.txt";
 
 #[derive(Parser, Default, Clone, Debug)]
@@ -61,6 +63,9 @@ pub enum TestDataset {
     Movies,
     #[default]
     Random, // TODO: make like Random(dim, mu, std) ...
+    DatacompSmall,
+    HnPosts,
+    Wikipedia,
 }
 impl FromStr for TestDataset {
     type Err = &'static str;
@@ -68,6 +73,7 @@ impl FromStr for TestDataset {
         match s {
             "movies" => Ok(TestDataset::Movies),
             "random" => Ok(TestDataset::Random),
+            "datacomp-small" => Ok(TestDataset::DatacompSmall),
             _ => Err("dataset does not exist"),
         }
     }
@@ -117,8 +123,23 @@ impl TestDataset {
                             values.push(rng.sample(normal));
                         }
                         (key, values)
-                    }).collect()
+                    })
+                    .collect()
             }
+            TestDataset::DatacompSmall => {
+                let mat: MatLEView<f32> = MatLEView::new(
+                    "Hackernews top posts",
+                    "../vector-store-relevancy-benchmark/assets/datacomp-small.mat",
+                    768,
+                );
+                mat.iter()
+                    .enumerate()
+                    .map(|(i, vec)| (i as u32, vec.to_vec()))
+                    .take(n)
+                    .collect()
+            }
+            TestDataset::HnPosts => todo!(),
+            TestDataset::Wikipedia => todo!(),
         }
     }
 }
