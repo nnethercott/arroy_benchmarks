@@ -74,6 +74,8 @@ impl FromStr for TestDataset {
             "movies" => Ok(TestDataset::Movies),
             "random" => Ok(TestDataset::Random),
             "datacomp-small" => Ok(TestDataset::DatacompSmall),
+            "hn-posts" => Ok(TestDataset::HnPosts),
+            "wikipedia" => Ok(TestDataset::Wikipedia),
             _ => Err("dataset does not exist"),
         }
     }
@@ -128,7 +130,7 @@ impl TestDataset {
             }
             TestDataset::DatacompSmall => {
                 let mat: MatLEView<f32> = MatLEView::new(
-                    "Hackernews top posts",
+                    "datacomp small",
                     "../vector-store-relevancy-benchmark/assets/datacomp-small.mat",
                     768,
                 );
@@ -138,8 +140,31 @@ impl TestDataset {
                     .take(n)
                     .collect()
             }
-            TestDataset::HnPosts => todo!(),
-            TestDataset::Wikipedia => todo!(),
+            TestDataset::HnPosts => {
+                let mat: MatLEView<f32> = MatLEView::new(
+                    "Hackernews top posts",
+                    "../vector-store-relevancy-benchmark/assets/hn-posts.mat",
+                    512,
+                );
+                mat.iter()
+                    .enumerate()
+                    .map(|(i, vec)| (i as u32, vec.to_vec()))
+                    .take(n)
+                    .collect()
+
+            },
+            TestDataset::Wikipedia => {
+                let mat: MatLEView<f32> = MatLEView::new(
+                    "wikipedia",
+                    "../vector-store-relevancy-benchmark/assets/wikipedia-22-12-simple-embeddings.mat",
+                    768,
+                );
+                mat.iter()
+                    .enumerate()
+                    .map(|(i, vec)| (i as u32, vec.to_vec()))
+                    .take(n)
+                    .collect()
+            },
         }
     }
 }

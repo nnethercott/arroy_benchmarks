@@ -2,7 +2,7 @@ use std::{num::NonZeroUsize, str::FromStr};
 
 use anyhow::Result;
 use arroy::{
-    distances::{Cosine, Euclidean, Manhattan}, Database, Distance, Reader
+    distances::{BinaryQuantizedCosine, Cosine, Euclidean, Manhattan}, Database, Distance, Reader
 };
 use arroy_benchmarks::utils::{BuildArgs, build};
 use clap::Parser;
@@ -21,6 +21,7 @@ pub enum DistanceType {
     Euclidean,
     Manhattan,
     Hamming,
+    BqCosine,
 }
 impl FromStr for DistanceType {
     type Err = &'static str;
@@ -28,6 +29,7 @@ impl FromStr for DistanceType {
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
             "cosine" => Ok(DistanceType::Cosine),
+            "bqcosine" => Ok(DistanceType::BqCosine),
             "euclidean" => Ok(DistanceType::Euclidean),
             "manhattan" => Ok(DistanceType::Manhattan),
             "hamming" => Ok(DistanceType::Hamming),
@@ -55,7 +57,7 @@ pub struct RunArgs {
     pub search_k: Option<usize>,
 
     #[clap(long)]
-    pub n_samples: Option<u64>
+    pub n_samples: Option<u64>,
 }
 
 fn run<D: Distance + HowFar>(args: Args) -> Result<()> {
@@ -71,7 +73,7 @@ fn run<D: Distance + HowFar>(args: Args) -> Result<()> {
     let database: Database<D> = env.open_database(&rtxn, None)?.unwrap();
 
     // build arroy::Reader
-    let res = (0..run_args.n_samples.unwrap_or(10))
+    let (scores, ndcg): (Vec<_>, Vec<_>) = (0..run_args.n_samples.unwrap_or(10))
         .into_par_iter()
         .map(|i| {
             // create new rotxn
@@ -83,17 +85,23 @@ fn run<D: Distance + HowFar>(args: Args) -> Result<()> {
 
             // simulate
             let mut rng = StdRng::seed_from_u64(build_args.seed + i);
-            let recalls: Vec<usize> = vec![1, 10, 100, 500];
+            let recalls: Vec<usize> = vec![50];
+            // let recalls: Vec<usize> = vec![1, 2, 8, 32, 128, 512];
             let (_, query) = points.choose(&mut rng).unwrap();
-            let scores =
-                simulate(&reader, &rtxn, query, points.clone(), &recalls, &run_args).unwrap();
+            let res = simulate(&reader, &rtxn, query, points.clone(), &recalls, &run_args).unwrap();
 
             // ok
-            Ok::<Vec<f32>, anyhow::Error>(scores)
+            Ok::<(Vec<f32>, f32), anyhow::Error>(res)
         })
-        .collect::<Result<Vec<Vec<f32>>, anyhow::Error>>()?;
+        .map(|r| r.unwrap())
+        .unzip();
+    // .collect::<Result<Vec<(Vec<f32>, f32)>, anyhow::Error>>()?;
 
-    println!("{:?}", reduce_mean_axis0(&res));
+    println!(
+        "recalls: {:?}, ndcg@50: {:.2}",
+        reduce_mean_axis0(&scores),
+        ndcg.iter().sum::<f32>()/(ndcg.len() as f32)
+    );
     Ok(())
 }
 
@@ -104,11 +112,11 @@ fn simulate<D: Distance + HowFar>(
     mut points: Vec<(u32, Vec<f32>)>,
     recalls: &[usize],
     run_args: &RunArgs,
-) -> Result<Vec<f32>> {
+) -> Result<(Vec<f32>, f32)> {
     // put these in order
     points.par_sort_unstable_by_key(|(_, p)| OrderedFloat(D::distance(query, p)));
 
-    let mut nns = reader.nns(recalls[recalls.len()-1]);
+    let mut nns = reader.nns(recalls[recalls.len() - 1]);
     if let Some(&search_k) = run_args.search_k.as_ref() {
         nns.search_k(NonZeroUsize::new(search_k).unwrap());
     }
@@ -133,7 +141,23 @@ fn simulate<D: Distance + HowFar>(
         })
         .collect();
 
-    Ok(scores)
+    // compute ndcg@50
+    let relevant = RoaringBitmap::from_iter(points.iter().take(50).map(|(a, _)| *a));
+    let dcg: f32 = neighbors
+        .iter()
+        .enumerate()
+        .map(|(i, (id, _))| {
+            let rel = if relevant.contains(*id) { 1.0 } else { 0.0 };
+            let denom = (i + 2) as f32; // rank starts at 1, so i+2 for log2(rank+1)
+            (2f32.powf(rel) - 1.0) / denom.log2()
+        })
+        .sum();
+    let idcg: f32 = (0..relevant.len())
+        .map(|i| 1.0 / ((i + 2) as f32).log2())
+        .sum();
+    let ndcg = dcg / idcg;
+
+    Ok((scores, ndcg))
 }
 
 // todo: clean this
@@ -159,8 +183,13 @@ impl HowFar for Manhattan {
 // impl HowFar for Hamming{
 //     fn distance(p: &[f32], q: &[f32]) -> f32 {
 //         hamming(&ndarray::aview1(p), &ndarray::aview1(q)) as f32
-//       }  
+//       }
 // }
+impl HowFar for BinaryQuantizedCosine{
+    fn distance(p: &[f32], q: &[f32]) -> f32 {
+        cosine(&ndarray::aview1(p), &ndarray::aview1(q))
+    }
+}
 
 fn reduce_mean_axis0(matrix: &[Vec<f32>]) -> Vec<f32> {
     if matrix.is_empty() {
@@ -191,7 +220,7 @@ fn main() -> Result<()> {
         DistanceType::Euclidean => run::<Euclidean>(args).unwrap(),
         DistanceType::Manhattan => run::<Manhattan>(args).unwrap(),
         DistanceType::Hamming => todo!(),
-        // DistanceType::Hamming => run::<Hamming>(args).unwrap(),
+        DistanceType::BqCosine => run::<BinaryQuantizedCosine>(args).unwrap(),
     }
 
     Ok(())
